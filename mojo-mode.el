@@ -37,10 +37,11 @@
   '("fn" "let" "var" "struct" "enum" "trait" "impl" "for" "while"
     "if" "elif" "else" "match" "return" "break" "continue"
     "from" "import" "as" "in" "where" "pub" "owned" "borrowed"
-    "const" "extern" "try" "except" "finally" "with" "yield"))
+    "const" "extern" "try" "except" "finally" "with" "yield"
+    "pass" "def"))
 
 (defconst mojo-constants '("True" "False" "None"))
-(defconst mojo-types     '("Int" "Float" "Bool" "String" "Vector" "Tensor"))
+(defconst mojo-types     '("Self" "Int" "Float" "Bool" "String" "Vector" "Tensor" "List"))
 
 (defconst mojo-font-lock
   `((,(regexp-opt mojo-types 'symbols)     . font-lock-type-face)
@@ -51,8 +52,8 @@
     (,(rx line-start (* space) "@" (group (+ (or word ?_ ?.))))
      (1 'mojo-decorator-face))
 
-    ;; fn name(
-    (,(rx line-start (* space) "fn" (+ space)
+    ;; fn/def name(
+    (,(rx line-start (* space) (or "fn" "def") (+ space)
           (group (+ (or word ?_))) (* space) "(")
      (1 font-lock-function-name-face))
 
@@ -306,7 +307,7 @@ If the current line's indent is <= the header's indent, return 0
 
 ;;; Imenu
 (defvar mojo-imenu-generic-expression
-  `(("Functions" ,(rx line-start (* space) "fn" (+ space)
+  `(("Functions" ,(rx line-start (* space) (or "fn" "def") (+ space)
                       (group (+ (or word ?_)))) 1)
     ("Structs"   ,(rx line-start (* space) "struct" (+ space)
                       (group (+ (or word ?_)))) 1))
