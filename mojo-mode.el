@@ -38,10 +38,12 @@
     "if" "elif" "else" "match" "return" "break" "continue"
     "from" "import" "as" "in" "where" "pub" "owned" "borrowed"
     "const" "extern" "try" "except" "finally" "with" "yield"
-    "pass" "def"))
+    "pass" "def" "raises"))
 
 (defconst mojo-constants '("True" "False" "None"))
-(defconst mojo-types     '("Self" "Int" "Float" "Bool" "String" "Vector" "Tensor" "List"))
+;; https://docs.modular.com/mojo/manual/types/
+(defconst mojo-types     '("Int" "Int8" "UInt8" "Int16" "UInt16" "Int32" "UInt32" "Int64" "UInt64"
+                           "Int128" "UInt128" "Int256" "UInt256" "Float64" "Float32" "Float16" "Bool" "String" "Vector" "Tensor" "List" "Error" "Tuple" "Dict" "Set" "Optional"))
 
 (defconst mojo-font-lock
   `((,(regexp-opt mojo-types 'symbols)     . font-lock-type-face)
@@ -68,19 +70,19 @@
   "Indent width for `mojo-mode`."
   :type 'integer :safe 'integerp)
 
-(defcustom mojo-indent-hanging nil
+(defcustom mojo-indent-hanging t
   "If non-nil, inside ( [ { indent under first token after opener (hanging indent).
-If nil, indent to opener's indentation plus `mojo-indent-offset`."
+                          If nil, indent to opener's indentation plus `mojo-indent-offset`."
   :type 'boolean :group 'mojo-mode)
 
 (defcustom mojo-indent-def-block-scale 2
   "Extra multiplier for lines inside parens of a block header (like fn ...():).
-Applied when the opening paren is at end of header line and the items start on the next line."
+                          Applied when the opening paren is at end of header line and the items start on the next line."
   :type 'integer :group 'mojo-mode)
 
 (defcustom mojo-indent-block-paren-deeper nil
   "If non-nil, when a block header has content after the opening paren
-on the same line, indent inner lines one extra `mojo-indent-offset`."
+                          on the same line, indent inner lines one extra `mojo-indent-offset`."
   :type 'boolean :group 'mojo-mode)
 
 (defcustom mojo-indent-trigger-commands
@@ -158,16 +160,13 @@ on the same line, indent inner lines one extra `mojo-indent-offset`."
 
 (defun mojo--member-base-indent ()
   "Indent for a member under the nearest struct/enum/trait/impl.
-If the current line's indent is <= the header's indent, return 0
-(module level). Otherwise header indent + `mojo-indent-offset`."
-  (let ((cur (current-indentation))
-        (pos (mojo--enclosing-type-pos)))
+  Always header indent + `mojo-indent-offset`."
+  (let ((pos (mojo--enclosing-type-pos)))
     (if (not pos)
         0
       (save-excursion
         (goto-char pos)
-        (let ((hdr (current-indentation)))
-          (if (<= cur hdr) 0 (+ hdr mojo-indent-offset)))))))
+        (+ (current-indentation) mojo-indent-offset)))))
 
 (defun mojo--line-ends-with-colon-at (pos)
   "Non-nil if the line at buffer position POS ends with a colon."
@@ -202,10 +201,6 @@ If the current line's indent is <= the header's indent, return 0
       (if open-pos
           (save-excursion (goto-char open-pos) (current-column))
         (max 0 (- prev-indent mojo-indent-offset))))
-
-     ;; Decorators act like members under type header, else module level
-     ((and (mojo--decorator-line-p) (null open-pos))
-      (mojo--member-base-indent))
 
      ;; New fn/struct/enum/trait/impl lines
      ((and (mojo--line-starts-with-top-level-starter-p) (null open-pos))
@@ -281,16 +276,7 @@ If the current line's indent is <= the header's indent, return 0
      ((and (eq ?: last-command-event) (eolp))
       (save-excursion
         (beginning-of-line)
-        (mojo-indent-line)))
-     ;; NEW: when starting a decorator or a member line
-     ((memq last-command-event '(?@ ?f))
-      (save-excursion
-        (beginning-of-line)
-        (when (save-excursion
-                (back-to-indentation)
-                (or (eq (char-after) ?@)
-                    (looking-at (rx "fn" symbol-end))))
-          (mojo-indent-line)))))))
+        (mojo-indent-line))))))
 
 ;;; Syntax table
 (defvar mojo-mode-syntax-table
@@ -300,6 +286,7 @@ If the current line's indent is <= the header's indent, return 0
     (modify-syntax-entry ?\n ">" st)
     ;; Strings
     (modify-syntax-entry ?\" "\"" st)
+    (modify-syntax-entry ?& "." st)
     ;; Treat underscore as word
     (modify-syntax-entry ?_ "w" st)
     st)
@@ -334,6 +321,7 @@ If the current line's indent is <= the header's indent, return 0
   (setq-local indent-line-function #'mojo-indent-line)
   (setq-local font-lock-defaults '(mojo-font-lock))
   (setq-local imenu-generic-expression mojo-imenu-generic-expression)
+
   (electric-indent-local-mode 1)
   ;; reindent after typing ) ] } , :
   (add-hook 'post-self-insert-hook #'mojo-indent-post-self-insert-function nil t))
